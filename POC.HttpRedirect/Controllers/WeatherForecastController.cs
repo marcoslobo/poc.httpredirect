@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -14,11 +16,6 @@ namespace POC.HttpRedirect.Controllers
     [Route("[controller]")]
     public class WeatherForecastController : ControllerBase
     {
-        private static readonly string[] Summaries = new[]
-        {
-            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-        };
-
         private readonly ILogger<WeatherForecastController> _logger;
 
         public WeatherForecastController(ILogger<WeatherForecastController> logger)
@@ -27,27 +24,29 @@ namespace POC.HttpRedirect.Controllers
         }
 
         [HttpGet]
-        public void Get()
+        public async Task<IActionResult> Get()
         {
+            var baseAddress = new Uri("http://127.0.0.1:8080");
+            var cookieContainer = new CookieContainer();
+            using (var handler = new HttpClientHandler() { CookieContainer = cookieContainer })
+            using (var client = new HttpClient(handler) { BaseAddress = baseAddress })
+            {
+                client.DefaultRequestHeaders.Add("Authorization", "Basic dXNlcjpiaXRuYW1p");
 
-            HttpContext.Response.Headers.Clear();
-            HttpContext.Response.Headers.Add("Authorization", "Basic dXNlcjpiaXRuYW1p");
+                cookieContainer.Add(baseAddress, new Cookie("JSESSIONID", "E29A51927750105B0492B7F5B15E2DE2"));
 
-            //HttpContext.Response.Headers.Add("Cookie", "JSESSIONID=8C51DD71CD21EA44F72566583DFD220A");
+                var result = await client.GetAsync($"/jasperserver/rest_v2/reportExecutions/1ef68a16-6990-4619-acf9-0c00b309487d/exports/c0be5ecb-68ed-4aeb-87da-ae7e00eef4c7/outputResource");
 
+                if (result.IsSuccessStatusCode)
+                {
+                    return File(await result.Content.ReadAsByteArrayAsync(), "application/pdf", "nogueiranervosinho.pdf");
+                }
 
-            // HttpContext.Response.Cookies.Append(
-            //"JSESSIONID",
-            //"8C51DD71CD21EA44F72566583DFD220A",
-            //new CookieOptions { Expires = DateTimeOffset.UtcNow.AddDays(1), HttpOnly = true, Secure = false }
-            //     );
-
-            var cookie = "";
-
-            HttpContext.Request.Cookies.TryGetValue("JSESSIONID",out cookie);
+            }
+            return default;           
 
 
-            HttpContext.Response.Redirect($"http://127.0.0.1:8080/jasperserver/rest_v2/reportExecutions/{"18229ebc-9089-4f83-84a8-e0d30decf26d"}/exports/{"7a617cf9-082f-4863-bd04-fa6fc6a10be7"}/outputResource");            
+
         }
     }
 }
